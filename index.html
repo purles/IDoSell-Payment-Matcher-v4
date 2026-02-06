@@ -297,7 +297,7 @@
                     </div>
                     <div class="upload-box" id="uploadBox2">
                         <label for="fileTranches">
-                            <div class="upload-icon">📁</div>
+                            <div class="upload-icon">📂</div>
                             <h3>Transze (wiele CSV)</h3>
                             <p>Export transz z IdoPay<br>Typ operacji: Wyplata za IdoPay<br>
                             <a href="https://csc.idosell.com/idopay/operation_history/transactions" target="_blank" onclick="event.stopPropagation()">Zrodlo</a></p>
@@ -428,11 +428,11 @@
 
     // ODS parsed data (shared across views)
     let odsState = {
-        transze: [],       // Wyp艂ata 艣rodk贸w IdoPay na konto
-        wplaty: [],        // Wp艂ata klienta
-        prowizje: [],      // Prowizja od wp艂aty IdoPay
+        transze: [],       // Wypłata środków IdoPay na konto
+        wplaty: [],        // Wpłata klienta
+        prowizje: [],      // Prowizja od wpłaty IdoPay
         zwroty: [],        // Zwrot
-        oplatyZaWyplate: [],// Prowizja za wyp艂at臋
+        oplatyZaWyplate: [],// Prowizja za wypłatę
         allRows: [],       // all parsed rows for debugging
         // Maps built from ODS
         trancheMap: {},    // paymentId -> { amount, dateAdded, dateBooked }
@@ -568,21 +568,59 @@
 
     // ===== ODS PARSING =====
     function parseODS(rawData) {
-        // Find header row
+        // Find header row by looking for "Typ transakcji" in any cell
         let headerRowIndex = -1;
         for (let i = 0; i < Math.min(rawData.length, 10); i++) {
-            const first = String(rawData[i]?.[0] || '').trim();
-            if (first.includes('Numer zam') || first === 'Numer zam贸wienia') {
+            const rowCells = (rawData[i] || []).map(c => String(c || '').trim());
+            if (rowCells.some(c => c.includes('Numer zam') || c === 'Numer zamówienia')) {
                 headerRowIndex = i;
                 break;
             }
         }
         if (headerRowIndex === -1) {
-            // fallback - try row 1 (row 0 is title)
-            headerRowIndex = 1;
+            // Wider fallback - look for "Typ transakcji"
+            for (let i = 0; i < Math.min(rawData.length, 15); i++) {
+                const rowCells = (rawData[i] || []).map(c => String(c || '').trim());
+                if (rowCells.some(c => c.includes('Typ transakcji'))) {
+                    headerRowIndex = i;
+                    break;
+                }
+            }
+        }
+        if (headerRowIndex === -1) {
+            console.error('ODS: cannot find header row! First 5 rows:', rawData.slice(0, 5));
+            return;
         }
 
-        console.log('ODS header at row:', headerRowIndex, 'Headers:', rawData[headerRowIndex]);
+        // Build column index from header names
+        const headerCells = (rawData[headerRowIndex] || []).map(c => String(c || '').trim());
+        const colIdx = {};
+        const colNames = {
+            orderNumber: ['Numer zamówienia', 'Numer zam'],
+            operationNumber: ['Numer operacji'],
+            amount: ['Kwota operacji'],
+            typ: ['Typ transakcji'],
+            dateAdded: ['Data dodania'],
+            dateBooked: ['Data zaksięgowania', 'Data zaksi'],
+            paymentId: ['ID płatności', 'ID platnosci'],
+            kwotaProwizji: ['Kwota prowizji']
+        };
+
+        for (const [key, names] of Object.entries(colNames)) {
+            colIdx[key] = -1;
+            for (const name of names) {
+                const idx = headerCells.findIndex(h => h.includes(name));
+                if (idx !== -1) { colIdx[key] = idx; break; }
+            }
+        }
+
+        console.log('ODS header at row:', headerRowIndex, 'Column mapping:', colIdx);
+        console.log('ODS headers found:', headerCells.filter(h => h));
+
+        if (colIdx.typ === -1) {
+            console.error('ODS: "Typ transakcji" column not found! Headers:', headerCells);
+            return;
+        }
 
         odsState = {
             transze: [], wplaty: [], prowizje: [], zwroty: [],
@@ -595,15 +633,15 @@
         for (const row of dataRows) {
             if (!row) continue;
 
-            // Safe access - don't filter by row length
-            const orderNumber = String(row[0] ?? '').trim();
-            const operationNumber = String(row[1] ?? '').trim();
-            const amount = parsePolishNumber(row[2]);
-            const typ = String(row[6] ?? '').trim();
-            const dateAddedStr = String(row[7] ?? '').trim();
-            const dateBookedStr = String(row[8] ?? '').trim();
-            const paymentId = String(row[11] ?? '').trim();
-            const kwotaProwizji = parsePolishNumber(row[13]); // Column N = "Kwota prowizji"
+            // Dynamic column access based on header mapping
+            const orderNumber = colIdx.orderNumber >= 0 ? String(row[colIdx.orderNumber] ?? '').trim() : '';
+            const operationNumber = colIdx.operationNumber >= 0 ? String(row[colIdx.operationNumber] ?? '').trim() : '';
+            const amount = colIdx.amount >= 0 ? parsePolishNumber(row[colIdx.amount]) : 0;
+            const typ = colIdx.typ >= 0 ? String(row[colIdx.typ] ?? '').trim() : '';
+            const dateAddedStr = colIdx.dateAdded >= 0 ? String(row[colIdx.dateAdded] ?? '').trim() : '';
+            const dateBookedStr = colIdx.dateBooked >= 0 ? String(row[colIdx.dateBooked] ?? '').trim() : '';
+            const paymentId = colIdx.paymentId >= 0 ? String(row[colIdx.paymentId] ?? '').trim() : '';
+            const kwotaProwizji = colIdx.kwotaProwizji >= 0 ? parsePolishNumber(row[colIdx.kwotaProwizji]) : 0;
 
             if (!typ) continue;
 
@@ -617,14 +655,14 @@
 
             odsState.allRows.push(record);
 
-            if (typ === 'Wyp艂ata 艣rodk贸w IdoPay na konto') {
+            if (typ === 'Wypłata środków IdoPay na konto') {
                 odsState.transze.push(record);
                 // Map: paymentId -> tranche info
                 odsState.trancheMap[paymentId] = {
                     amount: Math.abs(amount),
                     dateAdded, dateBooked
                 };
-            } else if (typ === 'Wp艂ata klienta') {
+            } else if (typ === 'Wpłata klienta') {
                 if (!dateBooked) continue;
                 odsState.wplaty.push(record);
                 // Map: orderNumber -> prowizja (column 13)
@@ -639,13 +677,13 @@
                     }
                     odsState.wplataPerOrder[orderNumber].push(record);
                 }
-            } else if (typ === 'Prowizja od wp艂aty IdoPay') {
+            } else if (typ === 'Prowizja od wpłaty IdoPay') {
                 if (!dateBooked) continue;
                 odsState.prowizje.push(record);
             } else if (typ === 'Zwrot') {
                 if (!dateBooked) continue;
                 odsState.zwroty.push(record);
-            } else if (typ === 'Prowizja za wyp艂at臋') {
+            } else if (typ === 'Prowizja za wypłatę') {
                 if (!dateBooked) continue;
                 odsState.oplatyZaWyplate.push(record);
             }
@@ -663,7 +701,7 @@
     async function parseTranchFiles(filesList) {
         trancheState.payments = [];
         trancheState.csvProwizje = {};  // trancheId -> total prowizje from CSV
-        trancheState.csvOplaty = {};    // trancheId -> total op艂aty za wyp艂at臋 from CSV
+        trancheState.csvOplaty = {};    // trancheId -> total opłaty za wypłatę from CSV
 
         for (const file of filesList) {
             const text = await readCSVText(file);
@@ -674,15 +712,15 @@
 
             const headers = rows[0].map(h => h.trim());
             const idx = {
-                tytul: headers.indexOf('Tytu艂'),
-                forma: headers.indexOf('Forma p艂atno艣ci'),
-                dataPlatnosci: headers.indexOf('Data p艂atno艣ci'),
-                kwota: headers.indexOf('Kwota p艂atno艣ci'),
-                wartRozl: headers.indexOf('Warto艣膰 rozliczeniowa'),
-                pokrycie: headers.indexOf('Pokrycie warto艣ci transakcji'),
+                tytul: headers.indexOf('Tytuł'),
+                forma: headers.indexOf('Forma płatności'),
+                dataPlatnosci: headers.indexOf('Data płatności'),
+                kwota: headers.indexOf('Kwota płatności'),
+                wartRozl: headers.indexOf('Wartość rozliczeniowa'),
+                pokrycie: headers.indexOf('Pokrycie wartości transakcji'),
                 typOperacji: headers.indexOf('Typ operacji'),
-                idPlatnosci: headers.indexOf('ID p艂atno艣ci'),
-                idZamowienia: headers.indexOf('ID zam贸wienia'),
+                idPlatnosci: headers.indexOf('ID płatności'),
+                idZamowienia: headers.indexOf('ID zamówienia'),
             };
 
             if (!trancheState.csvProwizje[trancheId]) trancheState.csvProwizje[trancheId] = 0;
@@ -695,7 +733,7 @@
                 const typOperacji = (row[idx.typOperacji] || '').trim();
                 const forma = (row[idx.forma] || '').trim();
 
-                if (typOperacji === 'Wp艂ata' || typOperacji === 'Wplata') {
+                if (typOperacji === 'Wpłata' || typOperacji === 'Wplata') {
                     const tytul = (row[idx.tytul] || '').trim();
                     const orderNumber = extractOrderNumber(tytul, row[idx.idZamowienia]);
 
@@ -708,12 +746,12 @@
                         pokrycie: parsePolishNumber(row[idx.pokrycie]),
                         paymentId: (row[idx.idPlatnosci] || '').trim()
                     });
-                } else if (typOperacji === 'Wyp艂ata' || typOperacji === 'Wyplata') {
+                } else if (typOperacji === 'Wypłata' || typOperacji === 'Wyplata') {
                     const wartRozl = parsePolishNumber(row[idx.wartRozl]);
-                    if (forma === 'Prowizja za wyp艂at臋') {
+                    if (forma === 'Prowizja za wypłatę') {
                         trancheState.csvOplaty[trancheId] += wartRozl;
                     } else {
-                        // Prowizja od wp艂aty IdoPay
+                        // Prowizja od wpłaty IdoPay
                         trancheState.csvProwizje[trancheId] += wartRozl;
                     }
                 }
@@ -731,13 +769,13 @@
 
         const headers = rows[0].map(h => h.trim().replace(/^"|"$/g, ''));
         const idx = {
-            nr: headers.indexOf('Nr zam贸wienia'),
+            nr: headers.indexOf('Nr zamówienia'),
             status: headers.indexOf('Status'),
-            imie: headers.indexOf('Biling-Imi臋'),
+            imie: headers.indexOf('Biling-Imię'),
             nazwisko: headers.indexOf('Biling-Nazwisko'),
             firma: headers.indexOf('Biling-Nazwa firmy'),
-            data: headers.indexOf('Data zam贸wienia'),
-            oplata: headers.indexOf('Op艂ata 艂膮czna'),
+            data: headers.indexOf('Data zamówienia'),
+            oplata: headers.indexOf('Opłata łączna'),
             email: headers.indexOf('E-mail')
         };
 
@@ -822,7 +860,7 @@
             const trancheDate = trancheInfo ? trancheInfo.dateBooked : null;
 
             // Use CSV data for tranche validation (Pokrycie, not Kwota!)
-            // Formula: tranche_total = sum(Pokrycie) - sum(CSV prowizje) - op艂ata za wyp艂at臋
+            // Formula: tranche_total = sum(Pokrycie) - sum(CSV prowizje) - opłata za wypłatę
             const sumaPokrycie = payments.reduce((s, p) => s + p.pokrycie, 0);
             const sumaKwota = payments.reduce((s, p) => s + p.paymentAmount, 0);
             const csvProwizje = trancheState.csvProwizje[trancheId] || 0;
