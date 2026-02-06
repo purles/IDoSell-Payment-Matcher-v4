@@ -1,0 +1,1411 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDoSell Payment Matcher v.4</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #4E3261 0%, #6B4C7A 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: #F3E8E1;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4E3261 0%, #6B4C7A 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .header p { font-size: 14px; opacity: 0.9; }
+
+        .content { padding: 30px; }
+        .section { margin-bottom: 30px; }
+        .section h2 {
+            font-size: 20px; color: #333; margin-bottom: 20px;
+            padding-bottom: 10px; border-bottom: 2px solid #4E3261;
+        }
+
+        /* Upload */
+        .uploads-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .upload-box {
+            border: 2px dashed #4E3261;
+            border-radius: 8px;
+            padding: 25px 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #fff9f5;
+        }
+        .upload-box:hover {
+            border-color: #6B4C7A;
+            background: #f5f0eb;
+            transform: translateY(-2px);
+        }
+        .upload-box.loaded {
+            border-color: #28a745;
+            border-style: solid;
+            background: #f0faf3;
+        }
+        .upload-box input[type="file"] { display: none; }
+        .upload-box label { cursor: pointer; display: block; }
+        .upload-icon { font-size: 36px; margin-bottom: 10px; }
+        .upload-box h3 { font-size: 16px; color: #333; margin-bottom: 6px; }
+        .upload-box p { font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.4; }
+        .file-name {
+            font-size: 13px; color: #4E3261; font-weight: bold;
+            margin-top: 10px; min-height: 18px; word-break: break-all;
+        }
+
+        /* Nav */
+        .nav-menu {
+            display: flex;
+            background: #3a2348;
+            border-bottom: 2px solid #6B4C7A;
+        }
+        .nav-menu button {
+            flex: 1;
+            padding: 14px 20px;
+            background: transparent;
+            color: #ccc;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.2s;
+            border-radius: 0;
+            margin: 0;
+        }
+        .nav-menu button:hover {
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            transform: none;
+            box-shadow: none;
+        }
+        .nav-menu button.active {
+            color: #fff;
+            border-bottom-color: #e0a0ff;
+            background: rgba(255,255,255,0.1);
+        }
+        .nav-menu button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* Buttons */
+        button {
+            background: linear-gradient(135deg, #4E3261 0%, #6B4C7A 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(78, 50, 97, 0.4); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        .button-group {
+            display: flex; gap: 10px; flex-wrap: wrap;
+            margin-bottom: 20px; justify-content: center;
+        }
+
+        /* Alerts */
+        .alert { padding: 15px; border-radius: 6px; margin-bottom: 15px; }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .alert-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        .alert-info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+
+        /* Views */
+        .view-panel { display: none; }
+        .view-panel.active { display: block; }
+
+        .results-section { display: none; }
+        .results-section.show { display: block; }
+
+        /* Tables */
+        .results-table {
+            width: 100%; border-collapse: collapse;
+            margin-bottom: 20px; font-size: 13px;
+        }
+        .results-table thead {
+            background: #667eea; color: white;
+            position: sticky; top: 0;
+        }
+        .results-table th {
+            padding: 10px 8px; text-align: left;
+            font-weight: bold; border-bottom: 2px solid #764ba2;
+            white-space: nowrap;
+        }
+        .results-table td { padding: 10px 8px; border-bottom: 1px solid #ddd; }
+        .results-table tbody tr:hover { background: #fff9f5; }
+
+        .status-badge {
+            display: inline-block; padding: 4px 8px;
+            border-radius: 4px; font-size: 11px; font-weight: bold;
+        }
+        .status-ok { background: #d4edda; color: #155724; }
+        .status-warning { background: #fff3cd; color: #856404; }
+        .status-error { background: #f8d7da; color: #721c24; }
+
+        .discrepancy { color: #721c24; font-weight: bold; }
+        .negative-discrepancy {
+            color: #fff; background: #721c24; font-weight: bold;
+            padding: 4px 8px; border-radius: 4px;
+        }
+
+        .summary-box {
+            background: #fff9f5; border-left: 4px solid #667eea;
+            padding: 15px; border-radius: 4px; margin-bottom: 20px;
+        }
+        .summary-box h3 { color: #333; margin-bottom: 10px; font-size: 14px; }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        .stat {
+            padding: 10px; background: #F3E8E1;
+            border-radius: 4px; border: 1px solid #ddd;
+        }
+        .stat-label { font-size: 11px; color: #666; text-transform: uppercase; }
+        .stat-value { font-size: 18px; font-weight: bold; color: #4E3261; margin-top: 5px; }
+
+        .text-right { text-align: right; }
+
+        .loading { display: none; text-align: center; padding: 20px; }
+        .spinner {
+            border: 4px solid #f3f3f3; border-top: 4px solid #667eea;
+            border-radius: 50%; width: 30px; height: 30px;
+            animation: spin 1s linear infinite; margin: 0 auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Month selector */
+        .month-selector { margin-bottom: 20px; }
+        .month-selector .month-buttons {
+            display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;
+        }
+        .month-selector button.month-active {
+            background: #28a745;
+            box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.4);
+        }
+
+        /* Tranche group header */
+        .tranche-group-header td {
+            background: #e8daf0; font-weight: bold; font-size: 13px;
+            border-top: 3px solid #4E3261;
+        }
+        .tranche-group-header.tranche-error td {
+            background: #f8d7da;
+        }
+
+        .footer {
+            background: #fff9f5; padding: 20px; text-align: center;
+            color: #666; font-size: 12px; border-top: 1px solid #ddd;
+        }
+
+        /* Modal */
+        .modal {
+            display: none; position: fixed; z-index: 1000;
+            left: 0; top: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+        }
+        .modal.show { display: flex; justify-content: center; align-items: center; }
+        .modal-content {
+            background: #F3E8E1; padding: 40px; border-radius: 12px;
+            text-align: center; max-width: 500px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        .modal-content h2 { margin: 0 0 20px 0; font-size: 24px; }
+        .modal-content .modal-icon { font-size: 60px; margin-bottom: 20px; }
+        .modal-content p { margin: 10px 0; font-size: 16px; line-height: 1.6; }
+        .modal-content .modal-stats {
+            background: #fff9f5; padding: 20px; border-radius: 8px;
+            margin: 20px 0; border-left: 4px solid #4E3261;
+        }
+        .modal-content .modal-stat-item { margin: 10px 0; font-size: 14px; }
+        .modal-content button { margin-top: 20px; padding: 12px 40px; font-size: 16px; }
+
+        @media (max-width: 768px) {
+            .content { padding: 15px; }
+            .header h1 { font-size: 20px; }
+            .results-table { font-size: 11px; }
+            .results-table th, .results-table td { padding: 6px; }
+            .nav-menu { flex-direction: column; }
+            .uploads-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div id="summaryModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-icon" id="modalIcon"></div>
+            <h2 id="modalTitle"></h2>
+            <div class="modal-stats" id="modalStats"></div>
+            <p id="modalMessage"></p>
+            <button onclick="closeSummaryModal()">Dalej</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>IDoSell Payment Matcher v.4</h1>
+            <p>Analiza transz i rozbicie na zamowienia</p>
+        </div>
+
+        <div class="content">
+            <!-- ===== UPLOAD SECTION (shared) ===== -->
+            <div class="section">
+                <h2>Zaladuj pliki</h2>
+                <div class="uploads-grid">
+                    <div class="upload-box" id="uploadBox1">
+                        <label for="fileODS">
+                            <div class="upload-icon">馃搧</div>
+                            <h3>Zestawienie operacji</h3>
+                            <p>Export z IdoPay (ODS/XLSX/CSV)<br>Typ operacji: Wszystkie<br>
+                            <a href="https://csc.idosell.com/idopay/operation_history/transactions" target="_blank" onclick="event.stopPropagation()">Zrodlo</a></p>
+                            <input type="file" id="fileODS" accept=".ods,.xlsx,.xls,.csv">
+                            <div class="file-name" id="fileODSName"></div>
+                        </label>
+                    </div>
+                    <div class="upload-box" id="uploadBox2">
+                        <label for="fileTranches">
+                            <div class="upload-icon">馃搨</div>
+                            <h3>Transze (wiele CSV)</h3>
+                            <p>Export transz z IdoPay<br>Typ operacji: Wyplata za IdoPay<br>
+                            <a href="https://csc.idosell.com/idopay/operation_history/transactions" target="_blank" onclick="event.stopPropagation()">Zrodlo</a></p>
+                            <input type="file" id="fileTranches" accept=".csv" multiple>
+                            <div class="file-name" id="fileTranchesName"></div>
+                        </label>
+                    </div>
+                    <div class="upload-box" id="uploadBox3">
+                        <label for="fileOrders">
+                            <div class="upload-icon">馃搵</div>
+                            <h3>Zamowienia</h3>
+                            <p>Export zamowien ze sklepu<br><br>
+                            <a href="https://purles.pl/panel/app/orders-csv.php" target="_blank" onclick="event.stopPropagation()">Zrodlo</a></p>
+                            <input type="file" id="fileOrders" accept=".csv">
+                            <div class="file-name" id="fileOrdersName"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button onclick="processAll()">Analizuj</button>
+                    <button onclick="clearAll()">Wyczysc</button>
+                </div>
+
+                <div id="loadingIndicator" class="loading">
+                    <div class="spinner"></div>
+                    <p>Przetwarzanie plikow...</p>
+                </div>
+
+                <div id="alertContainer"></div>
+            </div>
+
+            <!-- ===== NAV MENU ===== -->
+            <div class="nav-menu" id="navMenu" style="display:none;">
+                <button onclick="switchView('overview')" id="navOverview" style="display:none;">Przeglad po calosci</button>
+                <button class="active" onclick="switchView('monthly')" id="navMonthly">Przeglad po miesiacu</button>
+                <button onclick="switchView('orders')" id="navOrders">Rozbicie na zamowienia</button>
+            </div>
+
+            <!-- ===== VIEW 1: PRZEGLAD PO CALOSCI ===== -->
+            <div class="view-panel" id="viewOverview">
+                <div class="section results-section" id="resultsSectionOverview">
+                    <h2>Przeglad po calosci</h2>
+                    <div class="summary-box">
+                        <h3>Podsumowanie</h3>
+                        <div class="summary-stats" id="summaryStatsOverview"></div>
+                    </div>
+                    <div class="button-group">
+                        <button onclick="exportTranszeCSV()">Eksport CSV</button>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table class="results-table">
+                            <thead><tr>
+                                <th>Status</th><th>Data dodania (ciecie)</th><th>ID transzy</th>
+                                <th>Kwota transzy (zl)</th><th>Wplaty BRUTTO (zl)</th><th>Prowizje (zl)</th>
+                                <th>Zwroty (zl)</th><th>Opl. za wyplate (zl)</th><th>NETTO (zl)</th>
+                                <th>Roznica (zl)</th><th>Liczba wplat</th>
+                            </tr></thead>
+                            <tbody id="tbodyOverview"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== VIEW 2: PRZEGLAD PO MIESIACU ===== -->
+            <div class="view-panel" id="viewMonthly">
+                <div id="monthSelectorTransze" class="month-selector"></div>
+                <div class="section results-section" id="resultsSectionMonthly">
+                    <h2>Przeglad po miesiacu</h2>
+                    <div class="summary-box">
+                        <h3>Podsumowanie</h3>
+                        <div class="summary-stats" id="summaryStatsMonthly"></div>
+                    </div>
+                    <div class="button-group">
+                        <button onclick="exportTranszeCSV('monthly')">Eksport CSV</button>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table class="results-table">
+                            <thead><tr>
+                                <th>Status</th><th>Data dodania (ciecie)</th><th>ID transzy</th>
+                                <th>Kwota transzy (zl)</th><th>Wplaty BRUTTO (zl)</th><th>Prowizje (zl)</th>
+                                <th>Zwroty (zl)</th><th>Opl. za wyplate (zl)</th><th>NETTO (zl)</th>
+                                <th>Roznica (zl)</th><th>Liczba wplat</th>
+                            </tr></thead>
+                            <tbody id="tbodyMonthly"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== VIEW 3: ROZBICIE NA ZAMOWIENIA ===== -->
+            <div class="view-panel" id="viewOrders">
+                <div id="monthSelectorOrders" class="month-selector"></div>
+                <div class="section results-section" id="resultsSectionOrders">
+                    <h2>Rozbicie na zamowienia</h2>
+                    <div class="summary-box">
+                        <h3>Podsumowanie</h3>
+                        <div class="summary-stats" id="summaryStatsOrders"></div>
+                    </div>
+                    <div class="button-group">
+                        <button onclick="exportOrdersCSV()">Eksport CSV</button>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table class="results-table">
+                            <thead><tr>
+                                <th>Status</th><th>Data transzy</th><th>ID transzy</th>
+                                <th>Kwota transzy (zl)</th><th>Nr zamowienia</th><th>Typ platnosci</th>
+                                <th>Data platnosci</th><th>Data zlozenia</th><th>Klient</th>
+                                <th>Kwota wplaty (zl)</th><th>Pokrycie w transzy (zl)</th>
+                                <th>Prowizja ODS (zl)</th>
+                                <th>Roznica transzy (zl)</th><th>Uwagi</th>
+                            </tr></thead>
+                            <tbody id="tbodyOrders"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            Narzedzie przetwarza dane lokalnie w przegladarce &bull; Brak przesylania danych na serwer
+        </div>
+    </div>
+
+    <script>
+    // ===== GLOBAL STATE =====
+    let currentView = 'monthly';
+
+    // ODS parsed data (shared across views)
+    let odsState = {
+        transze: [],       // Wyp艂ata 艣rodk贸w IdoPay na konto
+        wplaty: [],        // Wp艂ata klienta
+        prowizje: [],      // Prowizja od wp艂aty IdoPay
+        zwroty: [],        // Zwrot
+        oplatyZaWyplate: [],// Prowizja za wyp艂at臋
+        allRows: [],       // all parsed rows for debugging
+        // Maps built from ODS
+        trancheMap: {},    // paymentId -> { amount, dateAdded, dateBooked }
+        prowizjaPerOrder: {},// orderNumber -> total prowizja (from column 13)
+        wplataPerOrder: {} // orderNumber -> [{ amount, dateBooked, paymentId, prowizja }]
+    };
+
+    // Tranche CSVs data
+    let trancheState = {
+        payments: [],      // { trancheId, orderNumber, paymentType, paymentDate, paymentAmount, paymentId }
+        loaded: false
+    };
+
+    // Orders CSV data
+    let ordersMap = {};    // orderNumber -> { client, orderDate, totalAmount, status }
+    let ordersLoaded = false;
+
+    // View-specific results
+    let resultsOverview = null;
+    let resultsMonthly = null;
+    let selectedMonthTransze = 'all';
+    let ordersResults = [];
+    let ordersMonths = [];
+    let selectedMonthOrders = 'all';
+
+    // ===== FILE LISTENERS =====
+    document.getElementById('fileODS').addEventListener('change', function() {
+        const el = document.getElementById('fileODSName');
+        const box = document.getElementById('uploadBox1');
+        if (this.files[0]) { el.textContent = this.files[0].name; box.classList.add('loaded'); }
+        else { el.textContent = ''; box.classList.remove('loaded'); }
+    });
+    document.getElementById('fileTranches').addEventListener('change', function() {
+        const el = document.getElementById('fileTranchesName');
+        const box = document.getElementById('uploadBox2');
+        if (this.files.length > 0) { el.textContent = this.files.length + ' plikow'; box.classList.add('loaded'); }
+        else { el.textContent = ''; box.classList.remove('loaded'); }
+    });
+    document.getElementById('fileOrders').addEventListener('change', function() {
+        const el = document.getElementById('fileOrdersName');
+        const box = document.getElementById('uploadBox3');
+        if (this.files[0]) { el.textContent = this.files[0].name; box.classList.add('loaded'); }
+        else { el.textContent = ''; box.classList.remove('loaded'); }
+    });
+
+    // ===== MAIN PROCESS =====
+    async function processAll() {
+        const alertContainer = document.getElementById('alertContainer');
+        alertContainer.innerHTML = '';
+
+        const odsFile = document.getElementById('fileODS').files[0];
+        const trancheFiles = document.getElementById('fileTranches').files;
+        const ordersFile = document.getElementById('fileOrders').files[0];
+
+        if (!odsFile) {
+            showAlert('Blad', 'Zaladuj plik zestawienia operacji (ODS/XLSX/CSV).', 'error');
+            return;
+        }
+
+        document.getElementById('loadingIndicator').style.display = 'block';
+
+        try {
+            // 1. Parse ODS (required for all views)
+            const odsRaw = await readFileAsSheetRows(odsFile);
+            parseODS(odsRaw);
+
+            if (odsState.transze.length === 0) {
+                showAlert('Blad', 'Nie znaleziono transz w pliku ODS!', 'error');
+                document.getElementById('loadingIndicator').style.display = 'none';
+                return;
+            }
+
+            // Count unique order numbers and multi-payment orders in ODS
+            const odsOrderCounts = {};
+            odsState.wplaty.forEach(w => {
+                if (w.orderNumber) odsOrderCounts[w.orderNumber] = (odsOrderCounts[w.orderNumber] || 0) + 1;
+            });
+            const odsUniqueOrders = Object.keys(odsOrderCounts).length;
+            const odsMultiPayOrders = Object.values(odsOrderCounts).filter(c => c > 1).length;
+
+            let statsMsg = 'ODS: ' + odsState.wplaty.length + ' wplat (' + odsUniqueOrders + ' unikalnych zamowien), ' +
+                odsState.transze.length + ' transz, ' +
+                odsState.prowizje.length + ' prowizji, ' +
+                odsState.zwroty.length + ' zwrotow.';
+            if (odsMultiPayOrders > 0) {
+                statsMsg += ' [' + odsMultiPayOrders + ' zamowien z wieloma wplatami - np. czesc BLIK + czesc karta]';
+            }
+
+            // 2. Parse tranche CSVs (optional - for view 3)
+            trancheState = { payments: [], loaded: false };
+            if (trancheFiles && trancheFiles.length > 0) {
+                await parseTranchFiles(trancheFiles);
+                trancheState.loaded = true;
+                const csvUniqueOrders = new Set(trancheState.payments.map(p => p.orderNumber).filter(Boolean)).size;
+                statsMsg += ' | Transze CSV: ' + trancheState.payments.length + ' wplat (' + csvUniqueOrders + ' unikalnych zamowien) w ' +
+                    new Set(trancheState.payments.map(p => p.trancheId)).size + ' transzach.';
+                if (odsState.wplaty.length !== trancheState.payments.length) {
+                    statsMsg += ' [Roznica ODS vs CSV (' + odsState.wplaty.length + ' vs ' + trancheState.payments.length + '): ODS rozbija wplaty czesciowe na oddzielne wiersze]';
+                }
+            }
+
+            // 3. Parse orders CSV (optional - for view 3)
+            ordersMap = {};
+            ordersLoaded = false;
+            if (ordersFile) {
+                const ordText = await readCSVText(ordersFile);
+                parseOrdersCSV(ordText);
+                ordersLoaded = true;
+                statsMsg += ' | Zamowienia: ' + Object.keys(ordersMap).length + '.';
+            }
+
+            document.getElementById('loadingIndicator').style.display = 'none';
+            showAlert('Sukces', statsMsg, 'success');
+
+            // Build all views
+            buildTranszeResults();
+            if (trancheState.loaded) {
+                buildOrderResults();
+            }
+
+            // Show nav and activate current view
+            document.getElementById('navMenu').style.display = 'flex';
+            // Enable/disable orders tab
+            document.getElementById('navOrders').disabled = !trancheState.loaded;
+            switchView(currentView);
+
+        } catch (error) {
+            console.error(error);
+            showAlert('Blad', 'Blad przetwarzania: ' + error.message, 'error');
+            document.getElementById('loadingIndicator').style.display = 'none';
+        }
+    }
+
+    // ===== ODS PARSING =====
+    function parseODS(rawData) {
+        // Find header row
+        let headerRowIndex = -1;
+        for (let i = 0; i < Math.min(rawData.length, 10); i++) {
+            const first = String(rawData[i]?.[0] || '').trim();
+            if (first.includes('Numer zam') || first === 'Numer zam贸wienia') {
+                headerRowIndex = i;
+                break;
+            }
+        }
+        if (headerRowIndex === -1) {
+            // fallback - try row 1 (row 0 is title)
+            headerRowIndex = 1;
+        }
+
+        console.log('ODS header at row:', headerRowIndex, 'Headers:', rawData[headerRowIndex]);
+
+        odsState = {
+            transze: [], wplaty: [], prowizje: [], zwroty: [],
+            oplatyZaWyplate: [], allRows: [],
+            trancheMap: {}, prowizjaPerOrder: {}, wplataPerOrder: {}
+        };
+
+        const dataRows = rawData.slice(headerRowIndex + 1);
+
+        for (const row of dataRows) {
+            if (!row) continue;
+
+            // Safe access - don't filter by row length
+            const orderNumber = String(row[0] ?? '').trim();
+            const operationNumber = String(row[1] ?? '').trim();
+            const amount = parsePolishNumber(row[2]);
+            const typ = String(row[6] ?? '').trim();
+            const dateAddedStr = String(row[7] ?? '').trim();
+            const dateBookedStr = String(row[8] ?? '').trim();
+            const paymentId = String(row[11] ?? '').trim();
+            const kwotaProwizji = parsePolishNumber(row[13]); // Column N = "Kwota prowizji"
+
+            if (!typ) continue;
+
+            const dateAdded = parseDate(dateAddedStr);
+            const dateBooked = parseDate(dateBookedStr);
+
+            const record = {
+                orderNumber, operationNumber, amount, typ,
+                dateAdded, dateBooked, paymentId, kwotaProwizji
+            };
+
+            odsState.allRows.push(record);
+
+            if (typ === 'Wyp艂ata 艣rodk贸w IdoPay na konto') {
+                odsState.transze.push(record);
+                // Map: paymentId -> tranche info
+                odsState.trancheMap[paymentId] = {
+                    amount: Math.abs(amount),
+                    dateAdded, dateBooked
+                };
+            } else if (typ === 'Wp艂ata klienta') {
+                if (!dateBooked) continue;
+                odsState.wplaty.push(record);
+                // Map: orderNumber -> prowizja (column 13)
+                if (orderNumber) {
+                    if (!odsState.prowizjaPerOrder[orderNumber]) {
+                        odsState.prowizjaPerOrder[orderNumber] = 0;
+                    }
+                    odsState.prowizjaPerOrder[orderNumber] += kwotaProwizji;
+
+                    if (!odsState.wplataPerOrder[orderNumber]) {
+                        odsState.wplataPerOrder[orderNumber] = [];
+                    }
+                    odsState.wplataPerOrder[orderNumber].push(record);
+                }
+            } else if (typ === 'Prowizja od wp艂aty IdoPay') {
+                if (!dateBooked) continue;
+                odsState.prowizje.push(record);
+            } else if (typ === 'Zwrot') {
+                if (!dateBooked) continue;
+                odsState.zwroty.push(record);
+            } else if (typ === 'Prowizja za wyp艂at臋') {
+                if (!dateBooked) continue;
+                odsState.oplatyZaWyplate.push(record);
+            }
+        }
+
+        // Sort transze by dateAdded
+        odsState.transze.sort((a, b) => (a.dateAdded || 0) - (b.dateAdded || 0));
+
+        console.log('ODS parsed:', odsState.wplaty.length, 'wplat,',
+            odsState.transze.length, 'transz,',
+            Object.keys(odsState.prowizjaPerOrder).length, 'zamowien z prowizja');
+    }
+
+    // ===== TRANCHE CSV PARSING =====
+    async function parseTranchFiles(filesList) {
+        trancheState.payments = [];
+        trancheState.csvProwizje = {};  // trancheId -> total prowizje from CSV
+        trancheState.csvOplaty = {};    // trancheId -> total op艂aty za wyp艂at臋 from CSV
+
+        for (const file of filesList) {
+            const text = await readCSVText(file);
+            const trancheId = file.name.replace('.csv', '').trim();
+
+            const rows = parseCSVRows(text, ',');
+            if (rows.length < 2) continue;
+
+            const headers = rows[0].map(h => h.trim());
+            const idx = {
+                tytul: headers.indexOf('Tytu艂'),
+                forma: headers.indexOf('Forma p艂atno艣ci'),
+                dataPlatnosci: headers.indexOf('Data p艂atno艣ci'),
+                kwota: headers.indexOf('Kwota p艂atno艣ci'),
+                wartRozl: headers.indexOf('Warto艣膰 rozliczeniowa'),
+                pokrycie: headers.indexOf('Pokrycie warto艣ci transakcji'),
+                typOperacji: headers.indexOf('Typ operacji'),
+                idPlatnosci: headers.indexOf('ID p艂atno艣ci'),
+                idZamowienia: headers.indexOf('ID zam贸wienia'),
+            };
+
+            if (!trancheState.csvProwizje[trancheId]) trancheState.csvProwizje[trancheId] = 0;
+            if (!trancheState.csvOplaty[trancheId]) trancheState.csvOplaty[trancheId] = 0;
+
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (row.length < 3) continue;
+
+                const typOperacji = (row[idx.typOperacji] || '').trim();
+                const forma = (row[idx.forma] || '').trim();
+
+                if (typOperacji === 'Wp艂ata' || typOperacji === 'Wplata') {
+                    const tytul = (row[idx.tytul] || '').trim();
+                    const orderNumber = extractOrderNumber(tytul, row[idx.idZamowienia]);
+
+                    trancheState.payments.push({
+                        trancheId,
+                        orderNumber: orderNumber || '',
+                        paymentType: forma,
+                        paymentDate: (row[idx.dataPlatnosci] || '').trim(),
+                        paymentAmount: parsePolishNumber(row[idx.kwota]),
+                        pokrycie: parsePolishNumber(row[idx.pokrycie]),
+                        paymentId: (row[idx.idPlatnosci] || '').trim()
+                    });
+                } else if (typOperacji === 'Wyp艂ata' || typOperacji === 'Wyplata') {
+                    const wartRozl = parsePolishNumber(row[idx.wartRozl]);
+                    if (forma === 'Prowizja za wyp艂at臋') {
+                        trancheState.csvOplaty[trancheId] += wartRozl;
+                    } else {
+                        // Prowizja od wp艂aty IdoPay
+                        trancheState.csvProwizje[trancheId] += wartRozl;
+                    }
+                }
+            }
+        }
+
+        console.log('Tranche CSVs: ' + trancheState.payments.length + ' payments');
+    }
+
+    // ===== ORDERS CSV PARSING =====
+    function parseOrdersCSV(text) {
+        ordersMap = {};
+        const rows = parseCSVRows(text, ';');
+        if (rows.length < 2) return;
+
+        const headers = rows[0].map(h => h.trim().replace(/^"|"$/g, ''));
+        const idx = {
+            nr: headers.indexOf('Nr zam贸wienia'),
+            status: headers.indexOf('Status'),
+            imie: headers.indexOf('Biling-Imi臋'),
+            nazwisko: headers.indexOf('Biling-Nazwisko'),
+            firma: headers.indexOf('Biling-Nazwa firmy'),
+            data: headers.indexOf('Data zam贸wienia'),
+            oplata: headers.indexOf('Op艂ata 艂膮czna'),
+            email: headers.indexOf('E-mail')
+        };
+
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            const nr = clean(row[idx.nr]);
+            if (!nr) continue;
+
+            const imie = clean(row[idx.imie]);
+            const nazwisko = clean(row[idx.nazwisko]);
+            const firma = clean(row[idx.firma]);
+            const fullName = (imie + ' ' + nazwisko).trim();
+            const klient = firma && firma !== fullName && firma !== imie ? firma + ' (' + fullName + ')' : fullName;
+
+            ordersMap[nr] = {
+                client: klient,
+                orderDate: clean(row[idx.data]),
+                totalAmount: parsePolishNumber(clean(row[idx.oplata])),
+                status: clean(row[idx.status]),
+                email: clean(row[idx.email])
+            };
+        }
+        console.log('Orders CSV: ' + Object.keys(ordersMap).length + ' orders');
+    }
+
+    // ===== BUILD TRANSZE RESULTS (Views 1 & 2) =====
+    function buildTranszeResults() {
+        const allSorted = [...odsState.transze].sort((a, b) => (a.dateAdded || 0) - (b.dateAdded || 0));
+
+        resultsOverview = allSorted.map((transza, index) => {
+            let periodStart;
+            const periodEnd = transza.dateAdded;
+
+            if (index === 0) {
+                periodStart = new Date(2000, 0, 1);
+            } else {
+                periodStart = allSorted[index - 1].dateAdded;
+            }
+
+            const wplatyW = odsState.wplaty.filter(w => w.dateBooked > periodStart && w.dateBooked <= periodEnd);
+            const prowizjeW = odsState.prowizje.filter(p => p.dateBooked > periodStart && p.dateBooked <= periodEnd);
+            const zwrotyW = odsState.zwroty.filter(z => z.dateBooked > periodStart && z.dateBooked <= periodEnd);
+            const oplatyW = odsState.oplatyZaWyplate.filter(o => o.dateBooked > periodStart && o.dateBooked <= periodEnd);
+
+            const sumaBrutto = wplatyW.reduce((s, w) => s + w.amount, 0);
+            const sumaProwizji = Math.abs(prowizjeW.reduce((s, p) => s + p.amount, 0));
+            const sumaZwrotow = zwrotyW.reduce((s, z) => s + z.amount, 0);
+            const sumaOplat = Math.abs(oplatyW.reduce((s, o) => s + o.amount, 0));
+
+            const netto = sumaBrutto - sumaProwizji + sumaZwrotow - sumaOplat;
+            const difference = Math.abs(transza.amount) - netto;
+
+            let status = 'ok';
+            if (Math.abs(difference) > 0.02) status = Math.abs(difference) > 10 ? 'error' : 'warning';
+
+            return {
+                transza, wplaty: wplatyW, prowizje: prowizjeW,
+                zwroty: zwrotyW, oplaty: oplatyW,
+                sumaBrutto, sumaProwizji, sumaZwrotow, sumaOplat,
+                netto, difference, status
+            };
+        });
+    }
+
+    // ===== BUILD ORDER RESULTS (View 3) =====
+    function buildOrderResults() {
+        ordersResults = [];
+
+        // Group tranche payments by trancheId
+        const byTranche = {};
+        trancheState.payments.forEach(p => {
+            if (!byTranche[p.trancheId]) byTranche[p.trancheId] = [];
+            byTranche[p.trancheId].push(p);
+        });
+
+        for (const trancheId of Object.keys(byTranche)) {
+            const payments = byTranche[trancheId];
+
+            // Get tranche total from ODS
+            const trancheInfo = odsState.trancheMap[trancheId];
+            const trancheTotal = trancheInfo ? trancheInfo.amount : 0;
+            const trancheDate = trancheInfo ? trancheInfo.dateBooked : null;
+
+            // Use CSV data for tranche validation (Pokrycie, not Kwota!)
+            // Formula: tranche_total = sum(Pokrycie) - sum(CSV prowizje) - op艂ata za wyp艂at臋
+            const sumaPokrycie = payments.reduce((s, p) => s + p.pokrycie, 0);
+            const sumaKwota = payments.reduce((s, p) => s + p.paymentAmount, 0);
+            const csvProwizje = trancheState.csvProwizje[trancheId] || 0;
+            const csvOplaty = trancheState.csvOplaty[trancheId] || 0;
+
+            const nettoCalc = sumaPokrycie - csvProwizje - csvOplaty;
+            const trancheDiff = trancheTotal - nettoCalc;
+
+            const trancheDateStr = trancheDate ? formatDate(trancheDate) : '-';
+
+            payments.forEach(p => {
+                const orderNum = p.orderNumber;
+                const orderInfo = ordersMap[orderNum] || {};
+                const prowizjaODS = odsState.prowizjaPerOrder[orderNum] || 0;
+
+                let uwagi = [];
+                if (!orderNum) uwagi.push('Brak nr zamowienia');
+                if (orderNum && !ordersMap[orderNum] && ordersLoaded) uwagi.push('Nie znaleziono w pliku zamowien');
+                if (p.pokrycie !== p.paymentAmount) uwagi.push('Czesciowe pokrycie: ' + p.pokrycie.toFixed(2) + ' z ' + p.paymentAmount.toFixed(2) + ' zl');
+
+                let status = 'ok';
+                if (uwagi.length > 0) status = 'warning';
+
+                ordersResults.push({
+                    status,
+                    trancheDateStr,
+                    trancheDate,
+                    trancheId,
+                    trancheTotal,
+                    trancheDiff,
+                    sumaKwota,
+                    sumaPokrycie,
+                    csvProwizje,
+                    csvOplaty,
+                    orderNumber: orderNum,
+                    paymentType: p.paymentType,
+                    paymentDate: p.paymentDate,
+                    orderDate: orderInfo.orderDate || '',
+                    client: orderInfo.client || '',
+                    paymentAmount: p.paymentAmount,
+                    pokrycie: p.pokrycie,
+                    prowizja: prowizjaODS,
+                    uwagi: uwagi.join('; ')
+                });
+            });
+        }
+
+        // Sort by tranche date desc
+        ordersResults.sort((a, b) => {
+            if (a.trancheDate && b.trancheDate) return b.trancheDate - a.trancheDate;
+            return (b.trancheId || '').localeCompare(a.trancheId || '');
+        });
+
+        // Detect months
+        ordersMonths = [...new Set(ordersResults.map(r => {
+            if (!r.trancheDate) return null;
+            const d = r.trancheDate;
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        }).filter(Boolean))].sort().reverse();
+    }
+
+    // ===== VIEW SWITCHING =====
+    function switchView(view) {
+        currentView = view;
+        document.querySelectorAll('.nav-menu button').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+
+        if (view === 'overview') {
+            document.getElementById('navOverview').classList.add('active');
+            document.getElementById('viewOverview').classList.add('active');
+            if (resultsOverview) {
+                displayTranszeResults(resultsOverview, 'tbodyOverview', 'summaryStatsOverview');
+                document.getElementById('resultsSectionOverview').classList.add('show');
+            }
+        } else if (view === 'monthly') {
+            document.getElementById('navMonthly').classList.add('active');
+            document.getElementById('viewMonthly').classList.add('active');
+            if (resultsOverview) {
+                const months = detectMonthsTransze();
+                showMonthSelectorTransze(months);
+                filterByMonthTransze(selectedMonthTransze || months[0] || 'all');
+            }
+        } else if (view === 'orders') {
+            document.getElementById('navOrders').classList.add('active');
+            document.getElementById('viewOrders').classList.add('active');
+            if (ordersResults.length > 0) {
+                showMonthSelectorOrders();
+                filterByMonthOrders(selectedMonthOrders || ordersMonths[0] || 'all');
+            }
+        }
+    }
+
+    // ===== TRANSZE DISPLAY =====
+    function detectMonthsTransze() {
+        const months = new Set();
+        odsState.transze.forEach(t => {
+            if (t.dateAdded) {
+                months.add(t.dateAdded.getFullYear() + '-' + String(t.dateAdded.getMonth() + 1).padStart(2, '0'));
+            }
+        });
+        return Array.from(months).sort().reverse();
+    }
+
+    function showMonthSelectorTransze(months) {
+        const container = document.getElementById('monthSelectorTransze');
+        let html = '<div class="alert alert-info"><strong>Wybierz miesiac:</strong><div class="month-buttons">';
+
+        months.forEach(m => {
+            const [year, monthNum] = m.split('-');
+            const active = selectedMonthTransze === m ? ' month-active' : '';
+            html += '<button class="' + active + '" onclick="filterByMonthTransze(\'' + m + '\')">' +
+                MONTH_NAMES[monthNum] + ' ' + year + '</button>';
+        });
+
+        const activeAll = selectedMonthTransze === 'all' ? ' month-active' : '';
+        html += '<button class="' + activeAll + '" style="background:#28a745" onclick="filterByMonthTransze(\'all\')">Wszystkie</button>';
+        html += '</div></div>';
+        container.innerHTML = html;
+    }
+
+    function filterByMonthTransze(month) {
+        selectedMonthTransze = month;
+        let filtered;
+        if (month === 'all') {
+            filtered = resultsOverview;
+        } else {
+            const [year, m] = month.split('-');
+            const start = new Date(year, parseInt(m) - 1, 1);
+            const end = new Date(year, parseInt(m), 0, 23, 59, 59);
+            filtered = resultsOverview.filter(r => r.transza.dateAdded >= start && r.transza.dateAdded <= end);
+        }
+
+        displayTranszeResults(filtered, 'tbodyMonthly', 'summaryStatsMonthly');
+        document.getElementById('resultsSectionMonthly').classList.add('show');
+        resultsMonthly = filtered;
+
+        // Re-render month buttons to highlight
+        const months = detectMonthsTransze();
+        showMonthSelectorTransze(months);
+    }
+
+    function displayTranszeResults(results, tbodyId, summaryId) {
+        const tbody = document.getElementById(tbodyId);
+        const summary = document.getElementById(summaryId);
+        tbody.innerHTML = '';
+
+        let totT = 0, totB = 0, totP = 0, totZ = 0, totO = 0, totN = 0, totD = 0;
+
+        results.forEach(r => {
+            totT += Math.abs(r.transza.amount);
+            totB += r.sumaBrutto; totP += r.sumaProwizji;
+            totZ += r.sumaZwrotow; totO += r.sumaOplat;
+            totN += r.netto; totD += r.difference;
+
+            const sc = 'status-' + r.status;
+            const st = r.status === 'ok' ? 'OK' : r.status === 'warning' ? 'UWAGA' : 'BLAD';
+            const dc = Math.abs(r.difference) > 0.02 ? (r.difference < 0 ? 'negative-discrepancy' : 'discrepancy') : '';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td><span class="status-badge ' + sc + '">' + st + '</span></td>' +
+                '<td>' + formatDate(r.transza.dateAdded) + '</td>' +
+                '<td>' + (r.transza.paymentId || '-') + '</td>' +
+                '<td class="text-right">' + Math.abs(r.transza.amount).toFixed(2) + '</td>' +
+                '<td class="text-right">' + r.sumaBrutto.toFixed(2) + '</td>' +
+                '<td class="text-right">-' + r.sumaProwizji.toFixed(2) + '</td>' +
+                '<td class="text-right">' + r.sumaZwrotow.toFixed(2) + '</td>' +
+                '<td class="text-right">-' + r.sumaOplat.toFixed(2) + '</td>' +
+                '<td class="text-right">' + r.netto.toFixed(2) + '</td>' +
+                '<td class="text-right ' + dc + '">' + r.difference.toFixed(2) + '</td>' +
+                '<td class="text-right">' + r.wplaty.length + '</td>';
+            tbody.appendChild(tr);
+        });
+
+        summary.innerHTML =
+            stat('Transze', results.length) +
+            stat('Suma transz (zl)', totT.toFixed(2)) +
+            stat('Wplaty BRUTTO (zl)', totB.toFixed(2)) +
+            stat('Prowizje (zl)', '-' + totP.toFixed(2)) +
+            stat('Zwroty (zl)', totZ.toFixed(2)) +
+            stat('Oplaty (zl)', '-' + totO.toFixed(2)) +
+            stat('NETTO (zl)', totN.toFixed(2)) +
+            '<div class="stat"><div class="stat-label">Suma roznic (zl)</div>' +
+            '<div class="stat-value" style="color:' + (Math.abs(totD) < 1 ? 'green' : 'red') + '">' +
+            totD.toFixed(2) + '</div></div>';
+    }
+
+    // ===== ORDERS DISPLAY (View 3) =====
+    function showMonthSelectorOrders() {
+        const container = document.getElementById('monthSelectorOrders');
+        let html = '<div class="alert alert-info"><strong>Wybierz miesiac:</strong><div class="month-buttons">';
+
+        ordersMonths.forEach(m => {
+            const [year, monthNum] = m.split('-');
+            const active = selectedMonthOrders === m ? ' month-active' : '';
+            html += '<button class="' + active + '" onclick="filterByMonthOrders(\'' + m + '\')">' +
+                MONTH_NAMES[monthNum] + ' ' + year + '</button>';
+        });
+
+        const activeAll = selectedMonthOrders === 'all' ? ' month-active' : '';
+        html += '<button class="' + activeAll + '" style="background:#28a745" onclick="filterByMonthOrders(\'all\')">Wszystkie</button>';
+        html += '</div></div>';
+        container.innerHTML = html;
+    }
+
+    function filterByMonthOrders(month) {
+        selectedMonthOrders = month;
+        let filtered;
+        if (month === 'all') {
+            filtered = ordersResults;
+        } else {
+            const [year, m] = month.split('-');
+            const start = new Date(year, parseInt(m) - 1, 1);
+            const end = new Date(year, parseInt(m), 0, 23, 59, 59);
+            filtered = ordersResults.filter(r => r.trancheDate && r.trancheDate >= start && r.trancheDate <= end);
+        }
+
+        displayOrderResults(filtered);
+        document.getElementById('resultsSectionOrders').classList.add('show');
+        showMonthSelectorOrders();
+    }
+
+    function displayOrderResults(filtered) {
+        const tbody = document.getElementById('tbodyOrders');
+        const summary = document.getElementById('summaryStatsOrders');
+        tbody.innerHTML = '';
+
+        let totalWplat = 0, totalProwizji = 0;
+        const warningsByType = {};
+        let currentTrancheId = null;
+        const trancheIds = new Set();
+
+        filtered.forEach(r => {
+            totalWplat += r.paymentAmount;
+            totalProwizji += r.prowizja;
+            if (r.status !== 'ok' && r.uwagi) {
+                r.uwagi.split('; ').forEach(u => {
+                    const typ = u.replace(/:.*$/, '').trim();
+                    warningsByType[typ] = (warningsByType[typ] || 0) + 1;
+                });
+            }
+            trancheIds.add(r.trancheId);
+
+            // Tranche group header
+            if (r.trancheId !== currentTrancheId) {
+                currentTrancheId = r.trancheId;
+                const trancheRows = filtered.filter(x => x.trancheId === r.trancheId);
+                // Use CSV-based Pokrycie for tranche validation
+                const sumaPokrycie = trancheRows.reduce((s, x) => s + x.pokrycie, 0);
+                const sumaKwota = trancheRows.reduce((s, x) => s + x.paymentAmount, 0);
+                const netto = sumaPokrycie - r.csvProwizje - r.csvOplaty;
+                const diff = r.trancheTotal - netto;
+                const diffOk = Math.abs(diff) <= 0.02;
+
+                const gr = document.createElement('tr');
+                gr.className = 'tranche-group-header' + (diffOk ? '' : ' tranche-error');
+                gr.innerHTML =
+                    '<td colspan="14">' +
+                    'Transza ' + r.trancheId +
+                    ' | Data: ' + r.trancheDateStr +
+                    ' | Kwota transzy: ' + r.trancheTotal.toFixed(2) + ' zl' +
+                    ' | Wplat: ' + trancheRows.length +
+                    ' | Suma pokrycia: ' + sumaPokrycie.toFixed(2) + ' zl' +
+                    (sumaKwota !== sumaPokrycie ? ' (kwota brutto: ' + sumaKwota.toFixed(2) + ')' : '') +
+                    ' | Prowizje: ' + r.csvProwizje.toFixed(2) + ' zl' +
+                    ' | Opl. wyplaty: ' + r.csvOplaty.toFixed(2) + ' zl' +
+                    ' | NETTO: ' + netto.toFixed(2) + ' zl' +
+                    ' | Roznica: <strong style="color:' + (diffOk ? 'green' : 'red') + '">' +
+                    diff.toFixed(2) + ' zl' + (diffOk ? ' OK' : ' BLAD!') + '</strong>' +
+                    '</td>';
+                tbody.appendChild(gr);
+            }
+
+            const sc = 'status-' + r.status;
+            const st = r.status === 'ok' ? 'OK' : 'UWAGA';
+            const pokrycieClass = r.pokrycie !== r.paymentAmount ? ' style="color:#856404;font-weight:bold"' : '';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td><span class="status-badge ' + sc + '">' + st + '</span></td>' +
+                '<td>' + r.trancheDateStr + '</td>' +
+                '<td>' + r.trancheId + '</td>' +
+                '<td class="text-right">' + r.trancheTotal.toFixed(2) + '</td>' +
+                '<td>' + (r.orderNumber || '-') + '</td>' +
+                '<td>' + (r.paymentType || '-') + '</td>' +
+                '<td>' + (r.paymentDate || '-') + '</td>' +
+                '<td>' + (r.orderDate || '-') + '</td>' +
+                '<td>' + (r.client || '-') + '</td>' +
+                '<td class="text-right">' + r.paymentAmount.toFixed(2) + '</td>' +
+                '<td class="text-right"' + pokrycieClass + '>' + r.pokrycie.toFixed(2) + '</td>' +
+                '<td class="text-right">' + r.prowizja.toFixed(2) + '</td>' +
+                '<td class="text-right ' + (Math.abs(r.trancheDiff) > 0.02 ? 'discrepancy' : '') + '">' +
+                r.trancheDiff.toFixed(2) + '</td>' +
+                '<td>' + (r.uwagi || '') + '</td>';
+            tbody.appendChild(tr);
+        });
+
+        const totalWarnings = Object.values(warningsByType).reduce((s, v) => s + v, 0);
+        const criticalWarnings = totalWarnings - (warningsByType['Czesciowe pokrycie'] || 0);
+
+        let warningsHtml = '';
+        if (totalWarnings === 0) {
+            warningsHtml = '<div class="stat"><div class="stat-label">Ostrzezenia</div>' +
+                '<div class="stat-value" style="color:green">0</div></div>';
+        } else {
+            // Show critical warnings (excluding partial pokrycie) prominently
+            if (criticalWarnings > 0) {
+                const critTypes = Object.entries(warningsByType)
+                    .filter(([k]) => k !== 'Czesciowe pokrycie')
+                    .map(([k, v]) => k + ': ' + v).join(', ');
+                warningsHtml += '<div class="stat"><div class="stat-label">Do sprawdzenia</div>' +
+                    '<div class="stat-value" style="color:red">' + criticalWarnings +
+                    '</div><div style="font-size:11px;color:#666">' + critTypes + '</div></div>';
+            }
+            if (warningsByType['Czesciowe pokrycie']) {
+                warningsHtml += '<div class="stat"><div class="stat-label">Czesciowe pokrycie</div>' +
+                    '<div class="stat-value" style="color:#856404">' + warningsByType['Czesciowe pokrycie'] +
+                    '</div><div style="font-size:11px;color:#666">informacyjne - kwoty sie bilansuja</div></div>';
+            }
+        }
+
+        // Matching stats: how many orders from orders file matched vs not
+        let matchingHtml = '';
+        if (ordersLoaded) {
+            const csvOrderNums = new Set(filtered.map(r => r.orderNumber).filter(Boolean));
+            const allOrderNums = Object.keys(ordersMap);
+            const matched = allOrderNums.filter(n => csvOrderNums.has(n)).length;
+            const unmatched = allOrderNums.length - matched;
+            matchingHtml =
+                stat('Zamowienia z pliku', allOrderNums.length) +
+                '<div class="stat"><div class="stat-label">Sparowane z IdoPay</div>' +
+                '<div class="stat-value" style="color:green">' + matched + '</div></div>' +
+                '<div class="stat"><div class="stat-label">Bez wplaty IdoPay</div>' +
+                '<div class="stat-value" style="color:' + (unmatched > 0 ? '#856404' : 'green') + '">' + unmatched +
+                '</div><div style="font-size:11px;color:#666">' +
+                (unmatched > 0 ? 'przelew, pobranie lub inna bramka' : '') + '</div></div>';
+        }
+
+        summary.innerHTML =
+            stat('Wplat w transzach', filtered.length) +
+            stat('Transz', trancheIds.size) +
+            stat('Suma wplat (zl)', totalWplat.toFixed(2)) +
+            stat('Suma prowizji (zl)', totalProwizji.toFixed(2)) +
+            warningsHtml +
+            matchingHtml;
+    }
+
+    // ===== EXPORTS =====
+    function exportTranszeCSV(type) {
+        const data = type === 'monthly' ? resultsMonthly : resultsOverview;
+        if (!data || data.length === 0) { alert('Brak danych do eksportu.'); return; }
+
+        const csv = [];
+        csv.push(csvRow(['Data transzy', 'ID transzy', 'Kwota transzy (zl)',
+            'Wplaty BRUTTO (zl)', 'Prowizje (zl)', 'Zwroty (zl)',
+            'Opl. za wyplate (zl)', 'NETTO (zl)', 'Roznica (zl)', 'Status', 'Liczba wplat']));
+
+        data.forEach(r => {
+            csv.push(csvRow([
+                formatDate(r.transza.dateBooked),
+                r.transza.paymentId || '-',
+                fmtNum(Math.abs(r.transza.amount)),
+                fmtNum(r.sumaBrutto),
+                fmtNum(-r.sumaProwizji),
+                fmtNum(r.sumaZwrotow),
+                fmtNum(-r.sumaOplat),
+                fmtNum(r.netto),
+                fmtNum(r.difference),
+                r.status === 'ok' ? 'OK' : 'ROZBIEZNOSC',
+                r.wplaty.length
+            ]));
+        });
+
+        downloadCSV(csv.join('\n'), 'idosell-transze.csv');
+    }
+
+    function exportOrdersCSV() {
+        let filtered;
+        if (selectedMonthOrders === 'all') {
+            filtered = ordersResults;
+        } else {
+            const [year, m] = selectedMonthOrders.split('-');
+            const start = new Date(year, parseInt(m) - 1, 1);
+            const end = new Date(year, parseInt(m), 0, 23, 59, 59);
+            filtered = ordersResults.filter(r => r.trancheDate && r.trancheDate >= start && r.trancheDate <= end);
+        }
+        if (!filtered || filtered.length === 0) { alert('Brak danych do eksportu.'); return; }
+
+        const csv = [];
+        csv.push(csvRow(['Status', 'Data transzy', 'ID transzy', 'Kwota transzy (zl)',
+            'Nr zamowienia', 'Typ platnosci', 'Data platnosci', 'Data zlozenia',
+            'Klient', 'Kwota wplaty (zl)', 'Pokrycie w transzy (zl)',
+            'Prowizja ODS (zl)', 'Roznica transzy (zl)', 'Uwagi']));
+
+        filtered.forEach(r => {
+            csv.push(csvRow([
+                r.status === 'ok' ? 'OK' : 'UWAGA',
+                r.trancheDateStr,
+                r.trancheId,
+                fmtNum(r.trancheTotal),
+                r.orderNumber || '',
+                r.paymentType || '',
+                r.paymentDate || '',
+                r.orderDate || '',
+                r.client || '',
+                fmtNum(r.paymentAmount),
+                fmtNum(r.pokrycie),
+                fmtNum(r.prowizja),
+                fmtNum(r.trancheDiff),
+                r.uwagi || ''
+            ]));
+        });
+
+        downloadCSV(csv.join('\n'), 'idosell-zamowienia.csv');
+    }
+
+    // ===== UTILS =====
+    function readFileAsSheetRows(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const workbook = XLSX.read(e.target.result, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const data = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '', raw: false });
+                    resolve(data);
+                } catch (error) { reject(error); }
+            };
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    function readCSVText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = e => resolve(e.target.result);
+            reader.onerror = reject;
+            reader.readAsText(file, 'UTF-8');
+        });
+    }
+
+    function parseDate(dateStr) {
+        if (!dateStr) return null;
+        const s = String(dateStr).trim();
+        const match = s.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+        if (match) return new Date(match[1], parseInt(match[2]) - 1, match[3], match[4], match[5]);
+        // Try other formats
+        const match2 = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+        if (match2) return new Date(match2[1], parseInt(match2[2]) - 1, match2[3]);
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? null : d;
+    }
+
+    function parsePolishNumber(val) {
+        if (val === null || val === undefined) return 0;
+        const s = String(val).trim().replace(/\s/g, '');
+        if (!s || s === '' || s === 'Nie dotyczy' || s === 'Brak danych') return 0;
+        return parseFloat(s.replace(',', '.')) || 0;
+    }
+
+    function formatDate(date) {
+        if (!date) return '-';
+        const d = new Date(date);
+        if (isNaN(d.getTime())) return '-';
+        return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' +
+               pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function clean(val) { return (val || '').trim().replace(/^"|"$/g, ''); }
+
+    function extractOrderNumber(tytul, idZamowienia) {
+        if (tytul) {
+            const parts = tytul.split(',');
+            const last = parts[parts.length - 1].trim();
+            if (/^\d+$/.test(last)) return last;
+        }
+        if (idZamowienia) {
+            const id = String(idZamowienia).trim();
+            if (id && id !== '' && id !== '0') return id;
+        }
+        return '';
+    }
+
+    function parseCSVRows(text, delimiter) {
+        const rows = [];
+        let current = [];
+        let field = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            if (inQuotes) {
+                if (ch === '"') {
+                    if (text[i + 1] === '"') { field += '"'; i++; }
+                    else { inQuotes = false; }
+                } else { field += ch; }
+            } else {
+                if (ch === '"') { inQuotes = true; }
+                else if (ch === delimiter) { current.push(field); field = ''; }
+                else if (ch === '\n' || (ch === '\r' && text[i + 1] === '\n')) {
+                    current.push(field); field = '';
+                    if (current.length > 1 || (current.length === 1 && current[0] !== '')) rows.push(current);
+                    current = [];
+                    if (ch === '\r') i++;
+                } else { field += ch; }
+            }
+        }
+        if (field || current.length > 0) {
+            current.push(field);
+            if (current.length > 1 || (current.length === 1 && current[0] !== '')) rows.push(current);
+        }
+        return rows;
+    }
+
+    function stat(label, value) {
+        return '<div class="stat"><div class="stat-label">' + label + '</div><div class="stat-value">' + value + '</div></div>';
+    }
+
+    function fmtNum(n) { return n.toFixed(2).replace('.', ','); }
+
+    function csvRow(arr) {
+        return arr.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(';');
+    }
+
+    function downloadCSV(csvContent, filename) {
+        const BOM = '\uFEFF';
+        const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+
+    const MONTH_NAMES = {
+        '01': 'Styczen', '02': 'Luty', '03': 'Marzec', '04': 'Kwiecien',
+        '05': 'Maj', '06': 'Czerwiec', '07': 'Lipiec', '08': 'Sierpien',
+        '09': 'Wrzesien', '10': 'Pazdziernik', '11': 'Listopad', '12': 'Grudzien'
+    };
+
+    function showAlert(title, message, type) {
+        const c = document.getElementById('alertContainer');
+        const div = document.createElement('div');
+        div.className = 'alert alert-' + type;
+        div.innerHTML = '<strong>' + title + ':</strong> ' + message;
+        c.appendChild(div);
+    }
+
+    function clearAll() {
+        document.getElementById('fileODS').value = '';
+        document.getElementById('fileODSName').textContent = '';
+        document.getElementById('uploadBox1').classList.remove('loaded');
+        document.getElementById('fileTranches').value = '';
+        document.getElementById('fileTranchesName').textContent = '';
+        document.getElementById('uploadBox2').classList.remove('loaded');
+        document.getElementById('fileOrders').value = '';
+        document.getElementById('fileOrdersName').textContent = '';
+        document.getElementById('uploadBox3').classList.remove('loaded');
+        document.getElementById('alertContainer').innerHTML = '';
+        document.getElementById('navMenu').style.display = 'none';
+        document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.results-section').forEach(s => s.classList.remove('show'));
+
+        odsState = { transze: [], wplaty: [], prowizje: [], zwroty: [], oplatyZaWyplate: [],
+            allRows: [], trancheMap: {}, prowizjaPerOrder: {}, wplataPerOrder: {} };
+        trancheState = { payments: [], loaded: false };
+        ordersMap = {};
+        ordersLoaded = false;
+        resultsOverview = null;
+        resultsMonthly = null;
+        ordersResults = [];
+        ordersMonths = [];
+        selectedMonthTransze = 'all';
+        selectedMonthOrders = 'all';
+    }
+
+    function closeSummaryModal() {
+        document.getElementById('summaryModal').classList.remove('show');
+    }
+    </script>
+</body>
+</html>
